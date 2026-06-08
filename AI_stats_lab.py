@@ -1,5 +1,6 @@
 import numpy as np
 
+
 # -------------------------------------------------
 # Question 1 – Exponential Distribution
 # -------------------------------------------------
@@ -7,25 +8,29 @@ import numpy as np
 def exponential_pdf(x, lam=1):
     """
     Return PDF of exponential distribution.
+
     f(x) = lam * exp(-lam*x) for x >= 0
     """
-    return np.where(x >= 0, lam * np.exp(-lam * x), 0)
+    if x < 0:
+        return 0
+    return lam * np.exp(-lam * x)
 
 
 def exponential_interval_probability(a, b, lam=1):
     """
     Compute P(a < X < b) using analytical formula.
-    P(a < X < b) = e^(-lam*a) - e^(-lam*b)
     """
+    if a < 0:
+        a = 0
     return np.exp(-lam * a) - np.exp(-lam * b)
 
 
-def simulate_exponential_probability(a, b, lam=1, n=100000):
+def simulate_exponential_probability(a, b, n=100000):
     """
     Simulate exponential samples and estimate
     P(a < X < b).
     """
-    samples = np.random.exponential(1/lam, n)
+    samples = np.random.exponential(scale=1, size=n)
     count = np.sum((samples > a) & (samples < b))
     return count / n
 
@@ -37,42 +42,52 @@ def simulate_exponential_probability(a, b, lam=1, n=100000):
 def gaussian_pdf(x, mu, sigma):
     """
     Return Gaussian PDF.
-    f(x) = (1 / sigma*sqrt(2pi)) * exp(-0.5 * ((x-mu)/sigma)^2)
     """
-    coefficient = 1 / (sigma * np.sqrt(2 * np.pi))
-    exponent = np.exp(-0.5 * ((x - mu) / sigma) ** 2)
-    return coefficient * exponent
-
+    return (1 / (np.sqrt(2 * np.pi) * sigma)) * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2))
 
 def posterior_probability(time):
     """
-    Compute P(B | X = time) using Bayes rule.
-    Priors:  P(A)=0.3, P(B)=0.7
-    Groups:  A ~ N(40,4), B ~ N(45,4)  → sigma=2
+    Compute P(B | X = time)
+    using Bayes rule.
+
+    Priors:
+    P(A)=0.3
+    P(B)=0.7
+
+    Distributions:
+    A ~ N(40,4)
+    B ~ N(45,4)
     """
-    pa, pb = 0.3, 0.7
-    likelihood_a = gaussian_pdf(time, mu=40, sigma=2)
-    likelihood_b = gaussian_pdf(time, mu=45, sigma=2)
-    evidence_a = pa * likelihood_a
-    evidence_b = pb * likelihood_b
-    return evidence_b / (evidence_a + evidence_b)
+    P_A = 0.3
+    P_B = 0.7
+
+    likelihood_A = np.exp(-((time - 40) ** 2) / 4)
+    likelihood_B = np.exp(-((time - 45) ** 2) / 4)
+
+    num = likelihood_B * P_B
+    den = likelihood_A * P_A + num
+
+    return num / den
+
 
 
 def simulate_posterior_probability(time, n=100000):
     """
     Estimate P(B | X=time) using simulation.
     """
-    # Step 1: assign groups randomly using priors
-    groups = np.random.choice(['A', 'B'], size=n, p=[0.3, 0.7])
+    classes = np.random.choice(['A', 'B'], size=n, p=[0.3, 0.7])
 
-    # Step 2: generate finish times based on group
-    times = np.where(groups == 'A',
-                     np.random.normal(40, 2, n),
-                     np.random.normal(45, 2, n))
+    samples = np.where(
+        classes == 'A',
+        np.random.normal(40, 2, n),   # std = sqrt(4)
+        np.random.normal(45, 2, n)
+    )
 
-    # Step 3: keep only swimmers close to target time
-    mask = np.abs(times - time) < 0.5
+    mask = np.abs(samples - time) < 0.5
 
-    # Step 4: fraction of those swimmers from Group B
-    return np.sum(groups[mask] == 'B') / np.sum(mask)
+    if np.sum(mask) == 0:
+        return 0
 
+    selected = classes[mask]
+
+    return np.sum(selected == 'B') / len(selected)
